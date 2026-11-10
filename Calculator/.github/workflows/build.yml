@@ -1,0 +1,53 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (without signing)
+        run: |
+          xcodebuild \
+            -project Calculator.xcodeproj \
+            -scheme Calculator \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Calculator.app Payload/
+          zip -qr Calculator.ipa Payload
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Calculator-ipa
+          path: Calculator.ipa
+
+      - name: Publish release (stable download link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Calculator (последняя сборка)
+          make_latest: true
+          files: Calculator.ipa
